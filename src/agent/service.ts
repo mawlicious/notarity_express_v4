@@ -132,6 +132,7 @@ export class AgentService {
 
     const input = await this.inputFor(message);
     const profile = await this.deps.repository.getConvenienceProfile<Record<string, unknown>>(message.phone);
+    console.info("Convenience profile lookup", { phone: message.phone, found: Boolean(profile) });
     const voiceDirective = message.kind === "voice"
       ? `\n\nVOICE REPLY MODE: Your final response will be spoken aloud through text-to-speech. Write natural speech, not screen copy. Use short conversational sentences. Do not use markdown, bullets, numbered lists, headings, tables, emoji, URLs, parenthetical asides, symbols, or formatting cues. Avoid reading IDs and raw timestamps aloud. Say dates, times, prices, and choices naturally.`
       : "";

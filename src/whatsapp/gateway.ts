@@ -8,6 +8,13 @@ import type { MediaStore } from "../media/store.js";
 
 const { Client, LocalAuth, MessageMedia, MessageTypes } = whatsappWeb;
 
+export const normalizeWhatsAppPhone = (value: string | undefined): string | undefined => {
+  const raw = value?.split("@")[0]?.trim();
+  if (!raw) return undefined;
+  const digits = raw.replace(/\D/g, "");
+  return digits || raw;
+};
+
 export class WhatsAppGateway {
   private client?: WhatsAppClient;
   private connectionState: "idle" | "connecting" | "open" | "closed" = "idle";
@@ -99,7 +106,7 @@ export class WhatsAppGateway {
     if (message.fromMe || message.broadcast || message.isStatus || message.from.endsWith("@g.us")) return;
     const chatId = message.from;
     void this.markSeen(chatId);
-    const phone = message.from.split("@")[0]!;
+    const phone = await this.phoneFor(message);
     const lane = this.lanes.get(phone) ?? pLimit(1);
     this.lanes.set(phone, lane);
     await lane(async () => {
@@ -119,6 +126,27 @@ export class WhatsAppGateway {
         await chat.clearState().catch(() => undefined);
       }
     });
+  }
+
+  private async phoneFor(message: Message): Promise<string> {
+    try {
+      const contact = await message.getContact();
+      const candidates = [
+        contact.number,
+        contact.id?.user,
+        message.from
+      ];
+      for (const candidate of candidates) {
+        const normalized = normalizeWhatsAppPhone(candidate);
+        if (normalized) return normalized;
+      }
+    } catch (error) {
+      console.warn("WhatsApp contact lookup failed; falling back to message sender id", {
+        from: message.from,
+        error: error instanceof Error ? error.message : error
+      });
+    }
+    return normalizeWhatsAppPhone(message.from) ?? message.from;
   }
 
   private async markSeen(chatId: string): Promise<void> {

@@ -12,6 +12,16 @@ const submissionCount = makeFunctionReference<"query", { phone: string }, number
 const getConvenienceProfile = makeFunctionReference<"query", { phone: string }, string | null>("agent:getConvenienceProfile");
 const saveConvenienceProfile = makeFunctionReference<"mutation", { phone: string; encryptedProfile: string }, null>("agent:saveConvenienceProfile");
 
+const phoneAliases = (phone: string): string[] => {
+  const aliases = new Set<string>([phone]);
+  const withoutChatSuffix = phone.split("@")[0] ?? phone;
+  aliases.add(withoutChatSuffix);
+  const digits = withoutChatSuffix.replace(/\D/g, "");
+  if (digits) aliases.add(digits);
+  if (digits && phone.trim().startsWith("+")) aliases.add(`+${digits}`);
+  return [...aliases].filter(Boolean);
+};
+
 export class Repository {
   private readonly cipher: ProfileCipher;
 
@@ -45,13 +55,17 @@ export class Repository {
   }
 
   async getConvenienceProfile<T>(phone: string): Promise<T | null> {
-    const encrypted = await this.client.query(getConvenienceProfile, { phone });
-    return encrypted ? this.cipher.decrypt<T>(encrypted) : null;
+    for (const alias of phoneAliases(phone)) {
+      const encrypted = await this.client.query(getConvenienceProfile, { phone: alias });
+      if (encrypted) return this.cipher.decrypt<T>(encrypted);
+    }
+    return null;
   }
 
   saveConvenienceProfile(phone: string, profile: unknown): Promise<null> {
+    const normalizedPhone = phoneAliases(phone).find((alias) => /^\d+$/.test(alias)) ?? phone;
     return this.client.mutation(saveConvenienceProfile, {
-      phone,
+      phone: normalizedPhone,
       encryptedProfile: this.cipher.encrypt(profile)
     });
   }
