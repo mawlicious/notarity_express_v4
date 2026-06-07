@@ -85,4 +85,20 @@ describe("NotarityClient", () => {
       contactDetails: "SameAsBillingDetails"
     });
   });
+
+  it("normalizes generic product tag lookups to the Notarity _tags query shape", async () => {
+    const fetchMock = vi.fn(async (url: URL) => {
+      expect(url.pathname).toBe("/products/tags");
+      expect(url.searchParams.getAll("_tags")).toEqual(["5DVjVha92EJnyyO6138f"]);
+      expect(url.searchParams.has("tags")).toBe(false);
+      return new Response(JSON.stringify([{ id: "product-1" }]), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new NotarityClient("https://staging-api.notarity.com", "", "test");
+
+    await client.apiRequest("GET", "/products/tags", { tags: "5DVjVha92EJnyyO6138f" });
+  });
 });

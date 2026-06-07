@@ -105,12 +105,28 @@ export class NotarityClient {
 
   apiRequest(method: string, path: string, query?: Record<string, string>, body?: unknown): Promise<unknown> {
     if (!path.startsWith("/") || path.startsWith("//")) throw new Error("Notarity API path must be relative and start with /");
-    const search = query ? `?${new URLSearchParams(query)}` : "";
+    const normalizedQuery = this.normalizeQuery(path, query);
+    const search = normalizedQuery ? `?${normalizedQuery}` : "";
     const hasBody = body !== undefined && method !== "GET" && method !== "DELETE";
     return this.request(`${path}${search}`, {
       method,
       ...(hasBody ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {})
     });
+  }
+
+  private normalizeQuery(path: string, query?: Record<string, string>): URLSearchParams | undefined {
+    if (!query) return undefined;
+    const params = new URLSearchParams();
+    if (path === "/products/tags") {
+      const rawTags = query._tags ?? query.tags ?? "";
+      const tags = rawTags.trim().startsWith("[")
+        ? JSON.parse(rawTags) as string[]
+        : rawTags.split(",").map((tag) => tag.trim()).filter(Boolean);
+      for (const tag of tags) params.append("_tags", tag);
+      return params;
+    }
+    for (const [key, value] of Object.entries(query)) params.append(key, value);
+    return params;
   }
 
   private toFormData(payload: unknown): FormData {

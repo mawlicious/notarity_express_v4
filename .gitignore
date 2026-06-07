@@ -4,6 +4,7 @@ dist
 coverage
 .baileys
 auth
+.wwebjs_cache
 media/*
 !media/.gitkeep
 
