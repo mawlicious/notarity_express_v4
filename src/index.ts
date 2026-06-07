@@ -9,7 +9,7 @@ import { MediaStore } from "./media/store.js";
 import { AgentService } from "./agent/service.js";
 import { WhatsAppGateway } from "./whatsapp/gateway.js";
 import { buildServer } from "./server.js";
-import { DEMO_PHONE, stevenMillerProfile } from "./agent/demo-profile.js";
+import { DEMO_PHONE_ALIASES, stevenMillerProfile } from "./agent/demo-profile.js";
 
 const config = loadConfig();
 const convex = new ConvexHttpClient(config.CONVEX_URL);
@@ -37,7 +37,7 @@ const agent = new AgentService({
 const gateway = new WhatsAppGateway(config, agent, media);
 const app = buildServer(config, formCache);
 
-await repository.saveConvenienceProfile(DEMO_PHONE, stevenMillerProfile);
+await Promise.all(DEMO_PHONE_ALIASES.map((phone) => repository.saveConvenienceProfile(phone, stevenMillerProfile)));
 await formCache.start();
 await gateway.start();
 await app.listen({ port: config.PORT, host: "0.0.0.0" });

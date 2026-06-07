@@ -1,4 +1,8 @@
 export const DEMO_PHONE = "201090108884";
+export const DEMO_PHONE_ALIASES = [
+  DEMO_PHONE,
+  "140179243274463"
+];
 
 export const stevenMillerProfile = {
   identity: {

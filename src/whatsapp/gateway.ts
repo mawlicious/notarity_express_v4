@@ -129,6 +129,19 @@ export class WhatsAppGateway {
   }
 
   private async phoneFor(message: Message): Promise<string> {
+    const senderId = message.from;
+    if (senderId.endsWith("@lid") && this.client) {
+      try {
+        const [resolved] = await this.client.getContactLidAndPhone([senderId]);
+        const phone = normalizeWhatsAppPhone(resolved?.pn);
+        if (phone) return phone;
+      } catch (error) {
+        console.warn("WhatsApp LID phone resolution failed; falling back to contact metadata", {
+          from: message.from,
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    }
     try {
       const contact = await message.getContact();
       const candidates = [
