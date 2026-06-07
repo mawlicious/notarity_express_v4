@@ -32,7 +32,11 @@ const agent = new AgentService({
   transcribe: (path) => ai.transcribe(path),
   extractPdf: (path) => ai.extractPdf(path, formCache.products),
   voice: elevenlabs,
-  model: config.OPENAI_ROUTINE_MODEL
+  model: config.OPENAI_ROUTINE_MODEL,
+  modelSettings: {
+    reasoning: { effort: config.OPENAI_ROUTINE_REASONING_EFFORT },
+    text: { verbosity: config.OPENAI_ROUTINE_VERBOSITY }
+  }
 });
 const gateway = new WhatsAppGateway(config, agent, media);
 const app = buildServer(config, formCache);

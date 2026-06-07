@@ -1,4 +1,4 @@
-import { Agent, MemorySession, run, tool } from "@openai/agents";
+import { Agent, MemorySession, run, tool, type ModelSettings } from "@openai/agents";
 import type { BookingForm, ExtractedFact, PriceResponse, Product, Slot } from "../domain/types.js";
 import type { NotarityClient } from "../clients/notarity.js";
 import type { ElevenLabsClient } from "../clients/elevenlabs.js";
@@ -24,6 +24,7 @@ export interface AgentDependencies {
   extractPdf(path: string, products: Product[]): Promise<ExtractedFact[]>;
   voice?: ElevenLabsClient;
   model: string;
+  modelSettings?: ModelSettings;
 }
 
 interface RunData {
@@ -123,6 +124,7 @@ export class AgentService {
       name: "Notarity Express WhatsApp Agent",
       instructions,
       model: deps.model,
+      modelSettings: deps.modelSettings,
       tools: this.buildTools()
     });
   }
