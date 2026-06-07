@@ -145,7 +145,10 @@ fields cannot violate the strict staging DTO.
 
 ## Team
 
-- Yahia Elramal — product and engineering
+- Yahia Elramal
+- Yassin Amin
+- Ahmed Shendy
+- Ahmed Sayed
 
 ## Submission
 
