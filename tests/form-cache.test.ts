@@ -29,4 +29,18 @@ describe("FormCache staging behavior", () => {
     expect(cache.form?.slug).toBe("test");
     expect(cache.products).toEqual([]);
   });
+
+  it("does not fail startup when the initial booking form fetch is unavailable", async () => {
+    const client = {
+      fetchForm: vi.fn(async () => { throw new Error("getaddrinfo ENOTFOUND staging-api.notarity.com"); }),
+      fetchProducts: vi.fn(async () => [])
+    };
+    const cache = new FormCache(client as never, 1000);
+
+    await expect(cache.start()).resolves.toBeUndefined();
+    cache.stop();
+    expect(cache.form).toBeUndefined();
+    expect(cache.lastRefreshError).toBeInstanceOf(Error);
+    expect(client.fetchProducts).not.toHaveBeenCalled();
+  });
 });

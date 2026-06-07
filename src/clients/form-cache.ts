@@ -4,24 +4,29 @@ import type { NotarityClient } from "./notarity.js";
 export class FormCache {
   form?: BookingForm;
   products: Product[] = [];
+  lastRefreshError?: unknown;
   private timer?: NodeJS.Timeout;
 
   constructor(private readonly client: NotarityClient, private readonly intervalMs: number) {}
 
   async refresh(): Promise<void> {
-    this.form = await this.client.fetchForm();
-    const tags = this.collectTags(this.form.components);
     try {
+      const form = await this.client.fetchForm();
+      const tags = this.collectTags(form.components);
+      this.form = form;
       this.products = await this.client.fetchProducts(tags);
+      this.lastRefreshError = undefined;
     } catch (error) {
-      this.products = [];
-      console.warn("Notarity products unavailable; booking completion is disabled", error);
+      this.lastRefreshError = error;
+      console.warn("Notarity form cache refresh failed; live booking data will be retried later", error);
     }
   }
 
   async start(): Promise<void> {
     await this.refresh();
-    this.timer = setInterval(() => void this.refresh(), this.intervalMs);
+    this.timer = setInterval(() => {
+      void this.refresh();
+    }, this.intervalMs);
     this.timer.unref();
   }
 
