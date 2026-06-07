@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+coverage
+.baileys
+auth
+media/*
+!media/.gitkeep
+
+.env.local
