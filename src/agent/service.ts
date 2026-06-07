@@ -81,7 +81,10 @@ Core behavior:
 - Immediately before submission, fetch current availability again and use the exact string id of a still-available slot. Never submit a cached slot object or a stale slot id.
 - Use calculate_appointment_price before final confirmation. The tool returns line items in cents and confirmedPrice in euros; use the returned confirmedPrice for the submission payload rather than calculating product totals yourself.
 - If a Notarity tool returns an error, explain the issue briefly and ask for the next useful detail or action.
-- When a tool fails, investigate and try to recover before replying: inspect the error, correct parameters, use a dedicated tool instead of the generic API tool, refresh form/product data when relevant, and retry reasonable alternatives.
+- When a tool fails, treat the tool result as live error evidence inside the conversation context. Read the exact status, endpoint, validation messages, and recovery hints before deciding what to do.
+- On tool errors, do not guess. First identify the concrete failed field/parameter/endpoint from the error. Then retry with corrected parameters, a corrected payload, a dedicated tool instead of the generic tool, or refreshed form/product/slot data when relevant.
+- If the fix requires user input, ask for the exact missing user-facing detail and explain why it is needed. Do not ask for internal API field names, raw IDs, DTO names, timezone labels, or validation jargon.
+- Only tell the user an operation failed after reasonable internal recovery attempts are exhausted or the missing input truly must come from them.
 - Use as many internal tool/model turns as needed within the run to finish useful work. Only tell the user an operation failed after reasonable recovery attempts are exhausted.
 - Never tell the user they need to verify their email. If a Notarity API error mentions email verification, treat it as an internal staging/API route issue and try the dedicated tool or ask for ordinary booking details.
 - For appointment availability, use fetch_time_slots. Do not use notarity_api_request for slots unless you are debugging an endpoint explicitly.
@@ -97,13 +100,52 @@ const logError = (label: string, error: unknown, context?: Record<string, unknow
   console.error(label, { ...context, error: details });
 };
 
+const parseNotarityError = (message: string): { status?: number; response?: unknown; validationMessages?: unknown } => {
+  const match = message.match(/^Notarity\s+(\d+):\s+([\s\S]*)$/);
+  if (!match) return {};
+  const responseText = match[2]?.trim();
+  let response: unknown = responseText;
+  try {
+    response = responseText ? JSON.parse(responseText) : undefined;
+  } catch {
+    response = responseText;
+  }
+  const validationMessages = response && typeof response === "object" && "message" in response
+    ? (response as { message?: unknown }).message
+    : undefined;
+  return { status: Number(match[1]), response, validationMessages };
+};
+
 const notarityToolError = (_context: unknown, error: unknown): string => {
   logError("Notarity agent tool failed", error);
   const message = error instanceof Error ? error.message : String(error);
+  const parsed = parseNotarityError(message);
+  const payload = {
+    type: "notarity_tool_error",
+    status: parsed.status,
+    errorMessage: message,
+    response: parsed.response,
+    validationMessages: parsed.validationMessages,
+    recoveryInstructions: [
+      "Use this exact error as context for the next model turn.",
+      "If validation messages identify forbidden fields, remove those fields and retry.",
+      "If validation messages identify missing required fields, fill them from saved profile/conversation/form data when available.",
+      "If a missing required field is not known, ask the user for that specific human-readable detail.",
+      "If this was a generic API request, retry with the dedicated Notarity tool when one exists.",
+      "If a submitted slot is stale or unavailable, fetch current slots again and retry with a fresh string slot id."
+    ]
+  };
   if (/email must be verified/i.test(message)) {
-    return "Internal staging API error while calling that endpoint. This is not a user email-verification requirement. Use the dedicated Notarity tools where possible, or ask the user for the next normal booking detail.";
+    return JSON.stringify({
+      ...payload,
+      recoveryInstructions: [
+        "This is an internal staging/API route issue, not a user email-verification requirement.",
+        "Do not tell the user to verify their email.",
+        "Use a dedicated Notarity tool where possible or ask for the next ordinary booking detail."
+      ]
+    });
   }
-  return `Notarity API error: ${message}`;
+  return JSON.stringify(payload);
 };
 
 const isResetCommand = (text: string): boolean => {

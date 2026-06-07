@@ -9,7 +9,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   CONVEX_URL: z.string().url(),
   OPENAI_API_KEY: z.string().default(""),
-  OPENAI_ROUTINE_MODEL: z.string().default("gpt-5.4"),
+  OPENAI_ROUTINE_MODEL: z.string().default("gpt-5.4-mini"),
   OPENAI_ROUTINE_REASONING_EFFORT: z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]).default("medium"),
   OPENAI_ROUTINE_VERBOSITY: z.enum(["low", "medium", "high"]).default("low"),
   OPENAI_RECOVERY_MODEL: z.string().default("gpt-5.4"),
