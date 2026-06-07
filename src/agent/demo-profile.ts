@@ -11,6 +11,8 @@ export const stevenMillerProfile = {
   },
   billingDetails: {
     name: "Meridian Ventures",
+    firstName: "Steven",
+    lastName: "Miller",
     street: "12 Nile View Tower",
     postalCode: "11511",
     city: "Cairo",
@@ -36,7 +38,8 @@ export const stevenMillerProfile = {
     },
     {
       fullName: "Daniel Weber",
-      role: "Managing director of Alpine Robotics GmbH"
+      role: "Managing director of Alpine Robotics GmbH",
+      email: "daniel.weber@alpinerobotics.example"
     }
   ],
   savedCompanies: [

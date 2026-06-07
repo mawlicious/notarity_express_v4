@@ -1,6 +1,8 @@
 import type { BookingForm, PriceResponse, Product, Slot } from "../domain/types.js";
 
 export class NotarityClient {
+  private bookingFormId?: string;
+
   constructor(private readonly baseUrl: string, private readonly token: string, private readonly slug: string) {}
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -41,6 +43,7 @@ export class NotarityClient {
 
   async fetchForm(): Promise<BookingForm> {
     const form = await this.request<BookingForm>(`/booking-form/slug?slug=${encodeURIComponent(this.slug)}`);
+    this.bookingFormId = form.id;
     return { ...form, components: form.components ?? form.pages?.flatMap((page) => page.components) ?? [] };
   }
 
@@ -132,27 +135,41 @@ export class NotarityClient {
     const products = Array.isArray(source.products)
       ? source.products.map((value) => this.normalizeProduct(value))
       : source.products;
+    const timeslots = Array.isArray(source.timeslots)
+      ? source.timeslots.map((value) => {
+        if (typeof value === "string") return value;
+        if (value && typeof value === "object") return String((value as Record<string, unknown>).id ?? "");
+        return String(value ?? "");
+      }).filter(Boolean)
+      : source.timeslots;
+    const billingDetails = source.billingDetails
+      ? this.normalizeAddress(source.billingDetails)
+      : source.billingDetails;
+    const contactDetails = source.contactDetails === "SameAsBillingDetails"
+      ? { contactDetailsSameAsBillingDetails: true }
+      : source.contactDetails
+        ? this.normalizeAddress(source.contactDetails)
+        : source.contactDetails;
     return {
       ...source,
+      _bookingForm: String(source._bookingForm ?? this.bookingFormId ?? ""),
+      newsletter: typeof source.newsletter === "boolean" ? source.newsletter : false,
       ...(participants !== undefined ? { participants } : {}),
-      ...(products !== undefined ? { products } : {})
+      ...(products !== undefined ? { products } : {}),
+      ...(timeslots !== undefined ? { timeslots } : {}),
+      ...(billingDetails !== undefined ? { billingDetails } : {}),
+      ...(contactDetails !== undefined ? { contactDetails } : {})
     };
   }
 
   private normalizeParticipant(value: unknown): Record<string, unknown> {
     const source = value && typeof value === "object" && !Array.isArray(value)
       ? value as Record<string, unknown>
-      : { name: String(value ?? "") };
-    const fullName = String(source.fullName ?? source.name ?? "").trim();
-    const names = fullName.split(/\s+/).filter(Boolean);
-    const firstName = String(source.firstName ?? names[0] ?? "").trim();
-    const lastName = String(source.lastName ?? names.slice(1).join(" ") ?? "").trim();
+      : {};
     const email = typeof source.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(source.email) && source.email.length <= 100
       ? source.email
       : undefined;
     return {
-      firstName,
-      lastName,
       ...(email ? { email } : {}),
       client: typeof source.client === "boolean" ? source.client : false
     };
@@ -166,6 +183,39 @@ export class NotarityClient {
       "id", "apostille", "userInput", "documentsNotReadyYet", "needHelpDrafting",
       "proofOfRepresentation", "files"
     ];
-    return Object.fromEntries(allowed.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
+    return {
+      ...Object.fromEntries(allowed.filter((key) => source[key] !== undefined).map((key) => [key, source[key]])),
+      documentsNotReadyYet: typeof source.documentsNotReadyYet === "boolean" ? source.documentsNotReadyYet : false,
+      needHelpDrafting: typeof source.needHelpDrafting === "boolean" ? source.needHelpDrafting : false
+    };
+  }
+
+  private normalizeAddress(value: unknown): unknown {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const source = value as Record<string, unknown>;
+    const countryCode = this.countryCode(String(source.countryCode ?? source.country ?? ""));
+    const fullName = String(source.fullName ?? source.name ?? "").trim();
+    const names = fullName.split(/\s+/).filter(Boolean);
+    return {
+      firstName: String(source.firstName ?? names[0] ?? "").slice(0, 100),
+      lastName: String(source.lastName ?? names.slice(1).join(" ") ?? "").slice(0, 100),
+      address: String(source.address ?? source.street ?? "").slice(0, 100),
+      zipCode: String(source.zipCode ?? source.postalCode ?? "").slice(0, 15),
+      city: String(source.city ?? "").slice(0, 100),
+      countryCode,
+      ...(typeof source.email === "string" ? { email: source.email.slice(0, 100) } : {}),
+      ...(typeof source.phone === "string" ? { phone: source.phone } : {})
+    };
+  }
+
+  private countryCode(value: string): string {
+    const normalized = value.trim().toUpperCase();
+    const codes: Record<string, string> = {
+      AUSTRIA: "AT",
+      EGYPT: "EG",
+      SPAIN: "ES",
+      GERMANY: "DE"
+    };
+    return codes[normalized] ?? normalized.slice(0, 2);
   }
 }

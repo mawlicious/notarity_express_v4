@@ -8,8 +8,7 @@ describe("NotarityClient", () => {
     const fetchMock = vi.fn(async (_url: URL, init?: RequestInit) => {
       const payload = JSON.parse(String(init?.body));
       expect(payload.participants).toEqual([{
-        firstName: "Daniel",
-        lastName: "Weber",
+        email: "daniel.weber@alpinerobotics.example",
         client: false
       }]);
       expect(payload.products).toEqual([{
@@ -19,6 +18,8 @@ describe("NotarityClient", () => {
         needHelpDrafting: false,
         files: []
       }]);
+      expect(payload.newsletter).toBe(false);
+      expect(payload._bookingForm).toBe("booking-form-id");
       return new Response(JSON.stringify([{ name: "POA", amount: 1, pricePerUnit: 10000, net: 10000 }]), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -28,11 +29,12 @@ describe("NotarityClient", () => {
     const client = new NotarityClient("https://staging-api.notarity.com", "", "test");
 
     const result = await client.price({
+      _bookingForm: "booking-form-id",
       participants: [{
         name: "Daniel Weber",
         role: "Managing Director",
         country: "Austria",
-        email: "not-an-email",
+        email: "daniel.weber@alpinerobotics.example",
         client: undefined
       }],
       products: [{
@@ -46,5 +48,41 @@ describe("NotarityClient", () => {
     });
 
     expect(result.confirmedPrice).toBe(100);
+  });
+
+  it("normalizes timeslot ids and saved billing aliases for submission", async () => {
+    const fetchMock = vi.fn(async (_url: URL, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      const payload = JSON.parse(String(form.get("payload")));
+      expect(payload.timeslots).toEqual(["slot-123"]);
+      expect(payload.billingDetails).toMatchObject({
+        firstName: "Meridian",
+        lastName: "Ventures",
+        address: "12 Nile View Tower",
+        zipCode: "11511",
+        city: "Cairo",
+        countryCode: "EG"
+      });
+      expect(payload.contactDetails).toEqual({ contactDetailsSameAsBillingDetails: true });
+      return new Response(JSON.stringify({ id: "request-1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new NotarityClient("https://staging-api.notarity.com", "", "test");
+
+    await client.submit({
+      _bookingForm: "booking-form-id",
+      timeslots: [{ id: "slot-123", startTime: "2026-06-08T08:00:00.000Z" }],
+      billingDetails: {
+        name: "Meridian Ventures",
+        street: "12 Nile View Tower",
+        postalCode: "11511",
+        city: "Cairo",
+        country: "Egypt"
+      },
+      contactDetails: "SameAsBillingDetails"
+    });
   });
 });
