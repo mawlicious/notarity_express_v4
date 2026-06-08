@@ -147,8 +147,7 @@ fields cannot violate the strict staging DTO.
 
 - Yahia Elramal
 - Yassin Amin
-- Ahmed Shendy
-- Ahmed Sayed
+
 
 ## Submission
 
